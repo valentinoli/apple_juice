@@ -1,0 +1,128 @@
+---
+title: "apple_juice"
+author: "Valentin Oliver Loftsson"
+date: "6/29/2020"
+geometry: margin=2.5cm
+fontsize: 12pt
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(fig.path='fig/', echo=FALSE, warning=FALSE, message=FALSE)
+library(dplyr)
+library(tidyr)
+library(caret)
+# library(My.stepwise)
+library(stats)
+library(knitr)
+library(kableExtra)
+```
+
+```{r load_data}
+features <- c("ph", "nisin", "temperature", "brix")
+interactions <- c(
+  "ph:nisin",
+  "temperature:ph",
+  "ph:brix",
+  "temperature:nisin",
+  "nisin:brix",
+  "temperature:brix"
+)
+target <- "growth"
+colnames <- c(features, c(target))
+apple_juice <- read.table(
+  "apple_juice.dat",
+  header = FALSE,
+  col.names = colnames,
+)
+apple_juice$growth <- factor(
+  apple_juice$growth,
+  labels = c("No", "Yes")
+)
+
+attach(apple_juice)
+```
+
+```{r}
+summary(apple_juice)
+```
+
+The frequency table of the `growth` response reveals that we have a semi-balanced dataset, with several more negative examples. Here, the response is categorical, so we are interested in proportions.
+
+We are interested in finding true biologically
+meaningful differences between sample types.
+
+![](ph.png) ![](nisin.png)
+
+![](temperature.png) ![](brix.png)
+
+
+```{r}
+table.ph <- addmargins(table(ph, growth))
+table.temperature <- addmargins(table(temperature, growth))
+table.brix <- addmargins(table(brix, growth))
+table.nisin <- addmargins(table(nisin, growth))
+```
+
+```{r}
+# table.brix %>%
+#   kable(caption = "soluble solids (°Brix)") %>%
+#   kable_styling(full_width = F) %>%
+#   row_spec(5, bold = T)
+```
+
+
+```{r}
+formulas = vector()
+scores = vector()
+
+lrt <- function(mod1, mod2) {
+  anova(mod1, mod2, test="Chisq")
+}
+
+logreg <- function(rhs) {
+  formula <- as.formula(paste("growth ~ ", rhs))
+  formulas <- append(formulas, formula)
+  glm(formula, family=binomial())
+}
+
+accuracy <- function(m) {
+  # type=response gives predicted probabilities
+  model_prob <- predict(m, apple_juice, type="response")
+  model_pred <- 1*(model_prob > .5)
+  model_real <- 1*(growth == "Yes")
+}
+```
+
+
+```{r}
+exp(coef(growth.glm)["temperature"])
+exp(confint(growth.glm, parm = "temperature"))
+```
+
+Each estimated coefficient is the expected change in the log odds of growth for a unit increase in the corresponding predictor variable holding the other predictor variables constant at certain value. 
+
+
+```{r}
+# # define training control
+# train_control <- trainControl(method = "cv", number = 10)
+# 
+# # train the model on training set
+# model <- train(growth ~ .,
+#                data = apple_juice,
+#                trControl = train_control,
+#                method = "glm",
+#                family=binomial())
+# 
+# # print cv scores
+# summary(model)
+
+# glm.init <- glm(growth ~ ., data=apple_juice, family = binomial())
+# mod <- step(glm.init, scope=. ~ .^2, direction="forward", trace=2)
+# summary(mod)
+# mod <- My.stepwise.glm(Y=target, variable.list=features, data=apple_juice, myfamily="binomial")
+
+# growth.glm <- glm(growth ~ nisin + temperature + ph + brix, family = binomial())
+# summary(growth.glm)
+```
+
