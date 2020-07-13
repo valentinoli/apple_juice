@@ -65,15 +65,13 @@ The frequency table of the `growth` response reveals that we have a semi-balance
 We are interested in finding true biologically
 meaningful differences between sample types.
 
-![](ph.png){width=48%} ![](white.png){width=4%} ![](nisin.png){width=48%}\
+<!-- ![](ph.png){width=48%} ![](white.png){width=4%} ![](nisin.png){width=48%}\ -->
 
-![](temperature.png){width=48%} ![](white.png){width=4%} ![](brix.png){width=48%}
+<!-- ![](temperature.png){width=48%} ![](white.png){width=4%} ![](brix.png){width=48%} -->
 
+<!-- ![](table5.png){width=50%}\ -->
 
-
-![](table5.png){width=50%}\
-
-![](table6.png){width=50%}\
+<!-- ![](table6.png){width=50%}\ -->
 
 ```{r}
 lrt <- function(mod1, mod2) {
@@ -165,12 +163,26 @@ prob.grid.temp.brix <- function(ph.const, nisin.const) {
   
   grid
 }
+
+prob.grid.nisin.brix <- function(ph.const, temp.const) {
+  dimrow <- max(nisin)
+  dimcol <- max(brix)
+  grid <- array(dim = c(dimrow, dimcol))
+  for (row in 1:dimrow) {
+    for (col in 1:dimcol) {
+      newdata <- data.frame(ph=ph.const, nisin=row, temperature=temp.const, brix=col)
+      grid[row, col] = predict(glm.final, newdata, type="response")
+    }
+  }
+  
+  grid
+}
 ```
 
 ```{r}
-plot.temp.brix <- function(data, title, xlabel, ylabel) {
-  x <- min(brix):ncol(data)
-  y <- min(temperature):nrow(data)
+plot.surface <- function(data, title, xlabel, ylabel, minx, miny) {
+  x <- minx:ncol(data)
+  y <- miny:nrow(data)
   z <- data[y, x]
   default.font = list(size = 10)
   fig <- plot_ly(x=x, y=y, z=z, type="surface", colors="YlOrRd")
@@ -199,36 +211,70 @@ plot.temp.brix <- function(data, title, xlabel, ylabel) {
           font = default.font
         )
       )
-    )
+    ),
+    height = 550
+    # margin = list(l = 10, r = 10, b = 10, t = 10)
   )
   fig
 }
 ```
 
+
 ```{r}
 xlabel <- "soluble solids conc. (°Brix)"
 ylabel <- "temperature (°C)"
-```
 
-```{r}
 g <- prob.grid.temp.brix(ph.const = 3.7, nisin.const = 0)
 
-plot.temp.brix(
+plot.surface(
   g,
   title = "Figure 1.a: Growth probability of CRA7152 in apple juice with nisin 0 IU/ml and pH = 3.7",
   xlabel,
-  ylabel
+  ylabel,
+  minx = min(brix),
+  miny = min(temperature)
 )
 ```
 
 ```{r}
 g <- prob.grid.temp.brix(ph.const = 4.5, nisin.const = 0)
 
-plot.temp.brix(
+plot.surface(
   g,
   title = "Figure 1.b: Growth probability of CRA7152 in apple juice with nisin 0 IU/ml and pH = 4.5",
   xlabel,
-  ylabel
+  ylabel,
+  minx = min(brix),
+  miny = min(temperature)
+)
+```
+
+```{r}
+xlabel <- "soluble solids conc. (°Brix)"
+ylabel <- "nisin conc. (UI/ml)"
+
+g <- prob.grid.nisin.brix(ph.const = 4.0, temp.const = 45)
+
+plot.surface(
+  g,
+  title = "Figure 2.a: Growth probability of CRA7152 in apple juice with pH = 4.5 and temp. = 45°C",
+  xlabel,
+  ylabel,
+  minx = min(brix),
+  miny = min(nisin)
+)
+```
+
+```{r}
+g <- prob.grid.nisin.brix(ph.const = 4.0, temp.const = 30)
+
+plot.surface(
+  g,
+  title = "Figure 2.b: Growth probability of CRA7152 in apple juice with pH = 4.5 and temp. = 30°C",
+  xlabel,
+  ylabel,
+  minx = min(brix),
+  miny = min(nisin)
 )
 ```
 
