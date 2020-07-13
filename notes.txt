@@ -1,0 +1,99 @@
+sample responses 1, sixteen days of incubation
+
+ph value of 3.5 (min) does not seem to cause growth
+nisin value of 70 (max) does not seem to cause growth
+growth seems to occur at temperatures above 25
+brix value of 19 (max) does not seem to cause growth
+
+5-10 pages (max), shorter the better
+
+Goal of statistical modeling: capture important characteristics of the relationship between the explanatory variables
+
+The usual linear regression model is not suitable for a binary response. We must use logistic regression, which is a generalization of a linear model for the purpose of modeling the relationship between covariates and a binary response variable.
+
+Parameter estimation by maximum likelihood.
+
+The parameter beta_k is such that exp(beta_k) is the odds ratio that the response takes value 1 when x_k goes up by 1, when the remaining variables are constant. So the coefficient beta_k is the log odds ratio.
+
+Logistic regression is a natural choice for a binary response. The probability of Y=1 is E[Y|x] = P(Y=1|x) = e^n / (1 + e^n) (inverse logit function). Note: the output is a probability of y=1 so we have to round that if we want to classify.
+
+if odds ratio (OR) is
+1. = 1 -> Y is independent of X
+2. > 1 -> condition presented by Y is more frequent for samples with X=x
+3. < 1 -> condition presented by Y is more frequent for samples with ?
+
+Difference between logistic and linear regression: error distribution is binomial for logistic regression (not normal)
+
+dichotomous
+
+LRT likelihood ratio test
+theta_MLE_H (null hypothesis beta = 0)
+theta_MLE_A (alternative hypothesis unrestricted beta)
+lambda = -2log(L(theta_MLE_H)/L(theta_MLE_A)
+
+CI for probabilities
+
+if models are nested (one is sub-model of other) we can use LRT
+
+```{r}
+features.pairs <- expand.grid(features, features)
+interaction.terms <- vector()
+
+for (i1 in seq_along(features)) {
+  for (i2 in seq_along(features)) {
+    if (i1 != i2) {
+      f1 <- features[i1]
+      f2 <- features[i2]
+
+      # create interaction term string
+      if (f1 > f2) {
+        val <- paste(f1, f2, sep=":")
+      } else {
+        val <- paste(f2, f1, sep=":")
+      }
+      
+      # add interaction term if not seen before
+      if (!any(val == interaction.terms)) {
+        interaction.terms <- append(interaction.terms, val)
+      }
+    }
+  }
+}
+
+interaction.terms
+```
+
+```{r}
+# # define training control
+# train_control <- trainControl(method = "cv", number = 10)
+# 
+# # train the model on training set
+# model <- train(growth ~ .,
+#                data = apple_juice,
+#                trControl = train_control,
+#                method = "glm",
+#                family=binomial())
+# 
+# # print cv scores
+# summary(model)
+
+# glm.init <- glm(growth ~ ., data=apple_juice, family = binomial())
+# mod <- step(glm.init, scope=. ~ .^2, direction="forward", trace=2)
+# summary(mod)
+# mod <- My.stepwise.glm(Y=target, variable.list=features, data=apple_juice, myfamily="binomial")
+
+# growth.glm <- glm(growth ~ nisin + temperature + ph + brix, family = binomial())
+# summary(growth.glm)
+```
+
+# rhs.interactions <- paste(interaction.terms, collapse =" + ")
+# rhs <- paste(rhs.features, rhs.interactions, sep=" + ")
+# drop1(update(glm.full, ~ . -ph:nisin -ph:temperature - nisin:temperature), test="LRT")
+
+Each estimated coefficient is the expected change in the log odds of growth for a unit increase in the corresponding predictor variable holding the other predictor variables constant at certain value. 
+
+for (var in features) {
+  
+  print(exp(coef(glm.final)[var]))
+  print(exp(confint(glm.final, parm = var)))
+}

@@ -1,10 +1,15 @@
 ---
-title: "apple_juice"
-author: "Valentin Oliver Loftsson"
-date: "6/29/2020"
+title: \vspace{-2cm} Logistic Regression Modelling to Predict Growth of Alicyclobacillus Acidoterrestris CRA7152 in Apple Juice
+author: "Loftsson, Valentin Oliver — valentin.loftsson@epfl.ch"
 geometry: margin=2.5cm
 fontsize: 12pt
 output: pdf_document
+header-includes:
+- \usepackage{fancyhdr}
+- \pagestyle{fancy}
+- \fancyhead[R]{Loftsson}
+- \usepackage{titlesec}
+- \titlespacing{\title}{0pt}{\parskip}{-\parskip}
 ---
 
 ```{r setup, include=FALSE}
@@ -12,22 +17,14 @@ knitr::opts_chunk$set(fig.path='fig/', echo=FALSE, warning=FALSE, message=FALSE)
 library(dplyr)
 library(tidyr)
 library(caret)
-# library(My.stepwise)
 library(stats)
 library(knitr)
 library(kableExtra)
+library(plotly)
 ```
 
 ```{r load_data}
 features <- c("ph", "nisin", "temperature", "brix")
-interactions <- c(
-  "ph:nisin",
-  "temperature:ph",
-  "ph:brix",
-  "temperature:nisin",
-  "nisin:brix",
-  "temperature:brix"
-)
 target <- "growth"
 colnames <- c(features, c(target))
 apple_juice <- read.table(
@@ -35,94 +32,203 @@ apple_juice <- read.table(
   header = FALSE,
   col.names = colnames,
 )
+factors <- c("No Growth", "Growth")
 apple_juice$growth <- factor(
   apple_juice$growth,
-  labels = c("No", "Yes")
+  labels = factors
 )
 
 attach(apple_juice)
 ```
 
-```{r}
-summary(apple_juice)
-```
+# Abstract
 
+# Introduction
+short intro / background, including a clear statement of the problem of interest
+
+# Exploratory Data Analysis
+complete exploratory data analysis
+
+# Model fitting and selection
+a description of your model fitting and selection analysis
+
+# Model assessment
+a description of your model assessment and justification / results of that
+
+# Final model
+your final chosen model written in mathematical terms; inclusion of relevant plots (they should be 'pretty')
+
+# Conclusion
+any conclusions adressing the problem of interest.
 The frequency table of the `growth` response reveals that we have a semi-balanced dataset, with several more negative examples. Here, the response is categorical, so we are interested in proportions.
 
 We are interested in finding true biologically
 meaningful differences between sample types.
 
-![](ph.png) ![](nisin.png)
+![](ph.png){width=48%} ![](white.png){width=4%} ![](nisin.png){width=48%}\
 
-![](temperature.png) ![](brix.png)
+![](temperature.png){width=48%} ![](white.png){width=4%} ![](brix.png){width=48%}
 
 
-```{r}
-table.ph <- addmargins(table(ph, growth))
-table.temperature <- addmargins(table(temperature, growth))
-table.brix <- addmargins(table(brix, growth))
-table.nisin <- addmargins(table(nisin, growth))
-```
+
+![](table5.png){width=50%}\
+
+![](table6.png){width=50%}\
 
 ```{r}
-# table.brix %>%
-#   kable(caption = "soluble solids (°Brix)") %>%
-#   kable_styling(full_width = F) %>%
-#   row_spec(5, bold = T)
-```
-
-
-```{r}
-formulas = vector()
-scores = vector()
-
 lrt <- function(mod1, mod2) {
   anova(mod1, mod2, test="Chisq")
 }
 
 logreg <- function(rhs) {
   formula <- as.formula(paste("growth ~ ", rhs))
-  formulas <- append(formulas, formula)
-  glm(formula, family=binomial())
+  # formulas <- append(formulas, formula)
+  glm(formula, data=apple_juice, family=binomial())
+}
+```
+
+```{r}
+kable.var <- function(dt, caption) {
+  dt %>%
+    kable(caption = caption) %>%
+    kable_styling(full_width = F) %>%
+    row_spec(5, bold = T)
 }
 
-accuracy <- function(m) {
+table.ph <- addmargins(table(ph, growth))
+table.nisin <- addmargins(table(nisin, growth))
+table.temperature <- addmargins(table(temperature, growth))
+table.brix <- addmargins(table(brix, growth))
+
+# kable.var(table.ph, "Table 1: pH")
+# kable.var(table.nisin, "Table 2: Nisin concentration (IU/ml)")
+# kable.var(table.temperature, "Table 3: Temperature (°C)")
+# kable.var(table.brix, "Table 4: Soluble solids conc. (°Brix)")
+```
+
+```{r}
+# All main and interaction effects
+rhs.features <- paste("(", paste(features, collapse =" + "), ")^2")
+
+# Model with all main and interaction effects
+glm.full <- logreg(rhs.features)
+
+# LRT
+# drop1(glm.full, test="LRT")
+
+# Final model
+terms.dropped <- " -ph:nisin -ph:temperature - nisin:temperature"
+glm.final <- logreg(paste(rhs.features, terms.dropped))
+glm.final.summary <- summary.glm(glm.final)
+# glm.final.summary
+```
+
+```{r}
+coefs <- round(glm.final.summary$coefficients[,c(1, 4)], digits = 4)
+caption <- "Table 5: Coefficients of the final model for A. Acidoterrestris growth in apple juice"
+
+# coefs %>%
+#     kable(caption = caption, col.names = c("Coefficient", "P value"), format = "html") %>%
+#     kable_styling(full_width = F) %>%
+#     save_kable("table5-uncropped.png")
+```
+
+```{r}
+confusion.matrix <- function(m) {
   # type=response gives predicted probabilities
   model_prob <- predict(m, apple_juice, type="response")
-  model_pred <- 1*(model_prob > .5)
-  model_real <- 1*(growth == "Yes")
+  model_pred <- factor(1*(model_prob > .5), labels=factors)
+  model_real <- factor(1*(growth == "Growth"), labels=factors)
+  table(model_real, model_pred)
+}
+
+caption <- "Table 6: Confusion matrix summarizing results of applying the logistic regression model on the training data samples"
+cm.table <- confusion.matrix(glm.final)
+# cm.table %>%
+#   kable(caption = caption, label = caption) %>%
+#   kable_styling(full_width = F) %>%
+#   add_header_above(c("Real label" = 1, "Predicted label" = 2))
+```
+
+
+```{r}
+prob.grid.temp.brix <- function(ph.const, nisin.const) {
+  dimrow <- max(temperature)
+  dimcol <- max(brix)
+  grid <- array(dim = c(dimrow, dimcol))
+  for (row in 1:dimrow) {
+    for (col in 1:dimcol) {
+      newdata <- data.frame(ph=ph.const, nisin=nisin.const, temperature=row, brix=col)
+      grid[row, col] = predict(glm.final, newdata, type="response")
+    }
+  }
+  
+  grid
 }
 ```
 
-
 ```{r}
-exp(coef(growth.glm)["temperature"])
-exp(confint(growth.glm, parm = "temperature"))
+plot.temp.brix <- function(data, title, xlabel, ylabel) {
+  x <- min(brix):ncol(data)
+  y <- min(temperature):nrow(data)
+  z <- data[y, x]
+  default.font = list(size = 10)
+  fig <- plot_ly(x=x, y=y, z=z, type="surface", colors="YlOrRd")
+  fig <- fig %>% layout(
+    font = default.font,
+    title = list(
+      text = title,
+      font = list(size = 12)
+    ),
+    scene = list(
+      xaxis = list(
+        title = list(
+          text = xlabel,
+          font = default.font
+        )
+      ),
+      yaxis = list(
+        title = list(
+          text = ylabel,
+          font = default.font
+        )
+      ),
+      zaxis = list(
+        title = list(
+          text = "growth probability",
+          font = default.font
+        )
+      )
+    )
+  )
+  fig
+}
 ```
 
-Each estimated coefficient is the expected change in the log odds of growth for a unit increase in the corresponding predictor variable holding the other predictor variables constant at certain value. 
-
+```{r}
+xlabel <- "soluble solids conc. (°Brix)"
+ylabel <- "temperature (°C)"
+```
 
 ```{r}
-# # define training control
-# train_control <- trainControl(method = "cv", number = 10)
-# 
-# # train the model on training set
-# model <- train(growth ~ .,
-#                data = apple_juice,
-#                trControl = train_control,
-#                method = "glm",
-#                family=binomial())
-# 
-# # print cv scores
-# summary(model)
+g <- prob.grid.temp.brix(ph.const = 3.7, nisin.const = 0)
 
-# glm.init <- glm(growth ~ ., data=apple_juice, family = binomial())
-# mod <- step(glm.init, scope=. ~ .^2, direction="forward", trace=2)
-# summary(mod)
-# mod <- My.stepwise.glm(Y=target, variable.list=features, data=apple_juice, myfamily="binomial")
+plot.temp.brix(
+  g,
+  title = "Figure 1.a: Growth probability of CRA7152 in apple juice with nisin 0 IU/ml and pH = 3.7",
+  xlabel,
+  ylabel
+)
+```
 
-# growth.glm <- glm(growth ~ nisin + temperature + ph + brix, family = binomial())
-# summary(growth.glm)
+```{r}
+g <- prob.grid.temp.brix(ph.const = 4.5, nisin.const = 0)
+
+plot.temp.brix(
+  g,
+  title = "Figure 1.b: Growth probability of CRA7152 in apple juice with nisin 0 IU/ml and pH = 4.5",
+  xlabel,
+  ylabel
+)
 ```
 
