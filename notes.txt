@@ -1,11 +1,3 @@
-sample responses 1, sixteen days of incubation
-
-ph value of 3.5 (min) does not seem to cause growth
-nisin value of 70 (max) does not seem to cause growth
-growth seems to occur at temperatures above 25
-brix value of 19 (max) does not seem to cause growth
-
-5-10 pages (max), shorter the better
 
 Goal of statistical modeling: capture important characteristics of the relationship between the explanatory variables
 
