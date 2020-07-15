@@ -26,252 +26,33 @@ header-includes:
 - \usepackage{subcaption}
 ---
 
-```{r setup, include=F}
-knitr::opts_chunk$set(echo=F, eval=F, warning=F, message=F)
-# library(dplyr)
-# library(tidyr)
-# library(caret)
-library(stats)
-# library(knitr)
-library(kableExtra)
-library(plotly)
-```
 
-```{r load_data}
-features <- c("ph", "nisin", "temperature", "brix")
-target <- "growth"
-colnames <- c(features, c(target))
-apple_juice <- read.table(
-  "apple_juice.dat",
-  header = FALSE,
-  col.names = colnames,
-)
-factors <- c("No Growth", "Growth")
-apple_juice$growth <- factor(
-  apple_juice$growth,
-  labels = factors
-)
 
-attach(apple_juice)
-```
 
-```{r}
-logreg <- function(rhs) {
-  formula <- as.formula(paste("growth ~ ", rhs))
-  glm(formula, data=apple_juice, family=binomial())
-}
-```
 
-```{r}
-kable.var <- function(dt, caption, file) {
-  dt %>%
-    kable(caption = caption) %>%
-    kable_styling(full_width = F) %>%
-    row_spec(5, bold = T)
-}
 
-table.ph <- addmargins(table(ph, growth))
-table.nisin <- addmargins(table(nisin, growth))
-table.temperature <- addmargins(table(temperature, growth))
-table.brix <- addmargins(table(brix, growth))
 
-kable.var(table.ph, "Table 1: pH")
-kable.var(table.nisin, "Table 2: Nisin concentration (IU/ml)")
-kable.var(table.temperature, "Table 3: Temperature (°C)")
-kable.var(table.brix, "Table 4: Soluble solids conc. (°Brix)")
-```
 
-```{r}
-# All main and interaction effects
-rhs.features <- paste("(", paste(features, collapse =" + "), ")^2")
 
-# Model with all main and interaction effects
-glm.full <- logreg(rhs.features)
 
-# LRT
-drop1.res <- drop1(glm.full, test="LRT")
 
-# Final model
-terms.dropped <- " -ph:nisin -ph:temperature -nisin:temperature"
-glm.final <- logreg(paste(rhs.features, terms.dropped))
-glm.final.summary <- summary.glm(glm.final)
-```
 
-```{r}
-drop1.lrt <- drop1.res[4] %>% round(2)
-drop1.lrt["P value"] <- drop1.res$`Pr(>Chi)` %>% signif(4)
-drop1.lrt <- drop1.lrt[2:7,]
-caption <- "Table 5: LRT test on interaction effects"
-drop1.lrt %>%
-  kable(caption = caption, format = "html") %>%
-  kable_styling(full_width = F, bootstrap_options = "basic", font_size = 20) %>%
-  column_spec(column = 1, width = "1in") %>%
-  column_spec(column = 2:3, width = "1.5in") %>%
-  save_kable("table5.png")
-```
 
-```{r}
-coefs <- round(glm.final.summary$coefficients[,c(1, 4)], digits = 4)
-caption <- "Table 6: Coefficients of the final model for A. Acidoterrestris growth in apple juice"
-coefs
-coefs %>%
-    kable(caption = caption, col.names = c("Coefficient", "P value"), format = "html") %>%
-    kable_styling(full_width = F, bootstrap_options = "basic", font_size = 20) %>%
-    save_kable("table6.png")
-```
 
-```{r}
-confusion.matrix <- function(m) {
-  # type=response gives predicted probabilities
-  model_prob <- predict(m, apple_juice, type="response")
-  model_pred <- factor(1*(model_prob > .5), labels=factors)
-  model_real <- factor(1*(growth == "Growth"), labels=factors)
-  table(model_real, model_pred)
-}
 
-caption <- "Table 7: Confusion matrix summarizing prediction results from applying the final model on the data samples"
-cm.table <- confusion.matrix(glm.final)
-cm.table %>%
-  kable(caption = caption, label = caption) %>%
-  kable_styling(full_width = F, bootstrap_options = "basic", font_size = 20) %>%
-  column_spec(column = 1, bold = TRUE) %>%
-  add_header_above(c("Real response" = 1, "Predicted response" = 2)) %>%
-  save_kable("table7.png")
-```
 
-```{r}
-prob.grid.temp.brix <- function(ph.const, nisin.const) {
-  dimrow <- max(temperature)
-  dimcol <- max(brix)
-  grid <- array(dim = c(dimrow, dimcol))
-  for (row in 1:dimrow) {
-    for (col in 1:dimcol) {
-      newdata <- data.frame(ph=ph.const, nisin=nisin.const, temperature=row, brix=col)
-      grid[row, col] = predict(glm.final, newdata, type="response")
-    }
-  }
-  
-  grid
-}
 
-prob.grid.nisin.brix <- function(ph.const, temp.const) {
-  dimrow <- max(nisin)
-  dimcol <- max(brix)
-  grid <- array(dim = c(dimrow, dimcol))
-  for (row in 1:dimrow) {
-    for (col in 1:dimcol) {
-      newdata <- data.frame(ph=ph.const, nisin=row, temperature=temp.const, brix=col)
-      grid[row, col] = predict(glm.final, newdata, type="response")
-    }
-  }
-  
-  grid
-}
-```
 
-```{r}
-plot.surface <- function(filename, data, title, xlabel, ylabel, minx, miny) {
-  x <- minx:ncol(data)
-  y <- miny:nrow(data)
-  z <- data[y, x]
-  default.font = list(size = 14)
-  fig <- plot_ly(x=x, y=y, z=z, type="surface", colors="YlOrRd")
-  fig <- fig %>% layout(
-    font = default.font,
-    title = list(
-      text = title,
-      font = list(size = 17),
-      y = 0.95
-    ),
-    scene = list(
-      xaxis = list(
-        title = list(
-          text = xlabel,
-          font = default.font
-        )
-      ),
-      yaxis = list(
-        title = list(
-          text = ylabel,
-          font = default.font
-        )
-      ),
-      zaxis = list(
-        title = list(
-          text = "growth probability",
-          font = default.font
-        )
-      )
-    ),
-    height = 650,
-    margin = list(t = 0)
-  )
-  api_create(fig, filename = filename)
-  fig
-}
-```
 
-```{r}
-xlabel <- "soluble solids conc. (°Brix)"
-ylabel <- "temperature (°C)"
 
-g <- prob.grid.temp.brix(ph.const = 3.7, nisin.const = 0)
 
-plot.surface(
-  "loftsson-apple-juice-cra7152-growth-figure-1a",
-  g,
-  title = "Figure 1.a: Growth probability of CRA7152 in\napple juice with <b>nisin 0 IU/ml and pH = 3.7</b>",
-  xlabel,
-  ylabel,
-  minx = min(brix),
-  miny = min(temperature)
-)
-```
 
-```{r}
-g <- prob.grid.temp.brix(ph.const = 4.5, nisin.const = 0)
 
-plot.surface(
-  "loftsson-apple-juice-cra7152-growth-figure-1b",
-  g,
-  title = "Figure 1.b: Growth probability of CRA7152 in\napple juice with <b>nisin 0 IU/ml and pH = 4.5</b>",
-  xlabel,
-  ylabel,
-  minx = min(brix),
-  miny = min(temperature)
-)
-```
 
-```{r}
-xlabel <- "soluble solids conc. (°Brix)"
-ylabel <- "nisin conc. (UI/ml)"
 
-g <- prob.grid.nisin.brix(ph.const = 4.0, temp.const = 45)
 
-plot.surface(
-  "loftsson-apple-juice-cra7152-growth-figure-2a",
-  g,
-  title = "Figure 2.a: Growth probability of CRA7152 in\napple juice with <b>pH = 4.5 and temp. = 45°C</b>",
-  xlabel,
-  ylabel,
-  minx = min(brix),
-  miny = min(nisin)
-)
-```
 
-```{r}
-g <- prob.grid.nisin.brix(ph.const = 4.0, temp.const = 30)
 
-plot.surface(
-  "loftsson-apple-juice-cra7152-growth-figure-2b",
-  g,
-  title = "Figure 2.b: Growth probability of CRA7152 in\napple juice with <b>pH = 4.5 and temp. = 30°C</b>",
-  xlabel,
-  ylabel,
-  minx = min(brix),
-  miny = min(nisin)
-)
-```
 
 # Introduction
 Microbiological contamination in processed acid fruit juices has been the subject of microbiological interest and research in the past few decades. Controlling such contamination is an important factor in the preservation of packed fruit juice products. To minimize contamination risk, it is essential to consider changes in the microbiology of the product over the entire production cycle, from cultivation and harvesting to preparation, distribution, and storage.
